@@ -1,0 +1,16 @@
+{
+  "invoice_number": "K2526064006_0001",
+  "invoice_date": "2026-02-16",
+  "vendor": {
+    "name": "Karnataka Roadlines Pvt Ltd",
+    "gst": "29AADCK7760M1ZV"
+  },
+  "customer": {
+    "name": "Reliance Consumer Products Limited"
+  },
+  "subtotal": 32500.0,
+  "tax": 1625.0,
+  "total": 34125.0,
+  "validation_passed": true,
+  "errors": []
+}
