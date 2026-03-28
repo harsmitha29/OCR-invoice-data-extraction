@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Invoice Extractor Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--green:#217346;--green-dark:#185a36;--green-bg:#e8f5ee;--header-bg:#1d6a3e;--ribbon-bg:#f3f3f3;--ribbon-border:#d0d0d0;--cell-border:#b0b0b0;--row-even:#f9f9f9;--row-hover:#e6f2ec;--text:#1a1a1a;--gray:#666}
+body{font-family:'Libre Franklin',sans-serif;background:#e8e8e8;min-height:100vh;display:flex;flex-direction:column}
+.title-bar{background:var(--header-bg);color:white;padding:6px 16px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
+.title-bar svg{width:22px;height:22px}.title-bar .filename{opacity:.75;font-weight:400;margin-left:4px}
+.ribbon{background:var(--ribbon-bg);border-bottom:2px solid var(--ribbon-border);padding:0 8px;display:flex;align-items:stretch;gap:2px;flex-wrap:wrap}
+.ribbon-tab{padding:8px 14px;font-size:12px;color:var(--gray);cursor:pointer;border-bottom:3px solid transparent;transition:all .15s}
+.ribbon-tab.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+.ribbon-group{display:flex;align-items:center;gap:6px;padding:6px 12px;border-left:1px solid var(--ribbon-border);margin-left:4px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border:none;border-radius:3px;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn-primary{background:var(--green);color:white}.btn-primary:hover{background:var(--green-dark);transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.btn-secondary{background:white;color:var(--green);border:1.5px solid var(--green)}.btn-secondary:hover{background:var(--green-bg)}
+.btn-excel{background:#1D6F42;color:white}.btn-excel:hover{background:#155232;transform:translateY(-1px)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+.formula-bar{background:white;border-bottom:1px solid var(--cell-border);padding:5px 12px;display:flex;align-items:center;gap:10px;font-size:12px}
+.cell-ref{font-family:'IBM Plex Mono',monospace;color:var(--green-dark);font-weight:600;min-width:60px;font-size:11px;border-right:1px solid var(--cell-border);padding-right:10px}
+.formula-text{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--gray);flex:1}
+.main{flex:1;display:flex;background:white;overflow:hidden}
+.row-nums{background:#f3f3f3;border-right:1px solid var(--cell-border);display:flex;flex-direction:column;min-width:42px;flex-shrink:0}
+.row-num-header{height:24px;border-bottom:1px solid var(--cell-border);background:#e8e8e8}
+.row-num{height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--gray);border-bottom:1px solid #e0e0e0;font-family:'IBM Plex Mono',monospace}
+.spreadsheet-wrap{flex:1;overflow:auto;display:flex;flex-direction:column}
+.upload-section{padding:16px 20px;border-bottom:1px solid #e0e0e0;background:#fafafa}
+.upload-zone{border:2px dashed #b0d0be;border-radius:6px;padding:24px 20px;text-align:center;background:white;cursor:pointer;transition:all .2s;position:relative}
+.upload-zone:hover,.upload-zone.dragover{border-color:var(--green);background:var(--green-bg)}
+.upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone .upload-icon{font-size:32px;margin-bottom:8px}.upload-zone h3{font-size:14px;color:var(--text);margin-bottom:4px}.upload-zone p{font-size:11px;color:var(--gray)}
+.upload-zone .file-name{margin-top:8px;font-size:12px;color:var(--green);font-weight:600;font-family:'IBM Plex Mono',monospace}
+.status-msg{font-size:12px;color:var(--gray);font-family:'IBM Plex Mono',monospace;margin-top:8px}
+.status-msg.error{color:#c0392b}.status-msg.success{color:var(--green)}
+table.sheet{border-collapse:collapse;width:100%;font-size:12px}
+table.sheet th{background:#217346;color:white;padding:8px 12px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-right:1px solid rgba(255,255,255,.2);white-space:nowrap;position:sticky;top:0;z-index:5}
+table.sheet td{padding:7px 12px;border-bottom:1px solid #e8e8e8;border-right:1px solid #ececec;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:11px;white-space:nowrap;cursor:cell;transition:background .1s}
+table.sheet tr:nth-child(even) td{background:var(--row-even)}table.sheet tr:hover td{background:var(--row-hover)}
+table.sheet td.field-label{background:#f0f7f3;color:var(--green-dark);font-weight:700;font-family:'Libre Franklin',sans-serif;font-size:11px;border-right:2px solid var(--green)}
+table.sheet td.empty{color:#ccc;font-style:italic}table.sheet td.valid{color:#1a7a3e}table.sheet td.invalid{color:#c0392b}
+table.sheet td.currency{text-align:right;color:#1a5c2e;font-weight:600}
+.empty-rows td{color:#ddd;font-family:'IBM Plex Mono',monospace;font-size:11px;height:28px;border-bottom:1px solid #f0f0f0;border-right:1px solid #f5f5f5}
+.sheet-tabs{background:#e0e0e0;border-top:1px solid var(--cell-border);display:flex;align-items:center;padding:0 8px;gap:2px}
+.sheet-tab{padding:5px 16px;font-size:11px;border:1px solid var(--cell-border);border-bottom:none;background:#d0d0d0;color:var(--gray);cursor:pointer;border-radius:3px 3px 0 0;margin-bottom:-1px}
+.sheet-tab.active{background:white;color:var(--green-dark);font-weight:700}
+.status-bar{background:var(--green);color:white;padding:4px 16px;font-size:11px;display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace}
+.status-bar .right{display:flex;gap:20px;opacity:.85}
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:100;align-items:center;justify-content:center}
+.loading-overlay.show{display:flex}
+.loading-card{background:white;border-radius:8px;padding:32px 40px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.big-spinner{width:40px;height:40px;border:4px solid #e0e0e0;border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+.loading-card p{font-size:12px;color:var(--gray);margin-top:6px}.loading-card h3{font-size:15px;color:var(--text)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:40px;right:24px;background:#1D6F42;color:white;padding:12px 20px;border-radius:6px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);transform:translateY(80px);opacity:0;transition:all .35s;z-index:200}
+.toast.show{transform:translateY(0);opacity:1}
+</style>
+</head>
+<body>
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-card"><div class="big-spinner"></div><h3>Running OCR Pipeline...</h3><p>Extracting invoice data, please wait</p></div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="title-bar">
+  <svg viewBox="0 0 24 24" fill="none"><rect width="24" height="24" rx="3" fill="#185a36"/><path d="M4 6h16M4 10h16M4 14h10M4 18h7" stroke="white" stroke-width="1.5" stroke-linecap="round"/><rect x="13" y="12" width="7" height="8" rx="1" fill="#2ed573" opacity=".9"/></svg>
+  Invoice Extractor <span class="filename">— InvoiceData.xlsx</span>
+</div>
+<div class="ribbon">
+  <div class="ribbon-tab active">Home</div>
+  <div class="ribbon-tab">Insert</div>
+  <div class="ribbon-tab">Data</div>
+  <div class="ribbon-tab">View</div>
+  <div class="ribbon-group">
+    <button class="btn btn-secondary" onclick="document.getElementById('fileInput').click()">📂 Open Invoice</button>
+    <button class="btn btn-primary" id="extractBtn" onclick="extractInvoice()" disabled>⚡ Extract</button>
+    <button class="btn btn-excel" id="xlsxBtn" onclick="downloadXLSX()" disabled>📊 Download Excel (.xlsx)</button>
+    <button class="btn btn-secondary" id="csvBtn" onclick="downloadCSV()" disabled>💾 Save as CSV</button>
+    <button class="btn btn-secondary" id="clearBtn" onclick="clearAll()" style="display:none">🗑 Clear</button>
+  </div>
+</div>
+<div class="formula-bar">
+  <span class="cell-ref" id="cellRef">A1</span>
+  <span style="color:#999;font-size:13px">fx</span>
+  <span class="formula-text" id="formulaText">=EXTRACT_INVOICE(file)</span>
+</div>
+<div class="main">
+  <div class="row-nums" id="rowNums">
+    <div class="row-num-header"></div>
+    <div class="row-num">1</div><div class="row-num">2</div><div class="row-num">3</div><div class="row-num">4</div><div class="row-num">5</div>
+    <div class="row-num">6</div><div class="row-num">7</div><div class="row-num">8</div><div class="row-num">9</div><div class="row-num">10</div>
+  </div>
+  <div class="spreadsheet-wrap">
+    <div class="upload-section">
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf,.jpg,.jpeg,.png,.bmp,.tiff" onchange="onFileSelected(event)"/>
+        <div class="upload-icon">📄</div>
+        <h3>Drop Invoice Here or Click to Browse</h3>
+        <p>Supports PDF, JPG, PNG, BMP, TIFF · Max 50MB</p>
+        <div class="file-name" id="selectedFileName"></div>
+      </div>
+      <div class="status-msg" id="statusMsg">No file selected. Open an invoice to begin extraction.</div>
+    </div>
+    <div style="padding:0;overflow:auto;flex:1">
+      <table class="sheet">
+        <thead><tr><th style="width:180px">Field</th><th style="width:260px">Extracted Value</th><th style="width:120px">Status</th><th style="width:200px">Notes</th></tr></thead>
+        <tbody id="tableBody">
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+          <tr class="empty-rows"><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="sheet-tabs">
+  <div class="sheet-tab active">📋 Extracted Data</div>
+  <div class="sheet-tab">📊 Summary</div>
+  <div class="sheet-tab">+</div>
+</div>
+<div class="status-bar">
+  <span id="statusBarLeft">Ready</span>
+  <div class="right"><span id="statusBarCount">Rows: 0</span><span>OCR Invoice Extractor v1.0</span><span>Harsmitha K &amp; Jahnavi K L</span></div>
+</div>
+<script>
+let selectedFile=null,extractedData=null,lastBaseName='';
+const zone=document.getElementById('uploadZone');
+zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover')});
+zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');const f=e.dataTransfer.files[0];if(f)handleFile(f)});
+function onFileSelected(e){const f=e.target.files[0];if(f)handleFile(f)}
+function handleFile(file){selectedFile=file;document.getElementById('selectedFileName').textContent='📎 '+file.name;document.getElementById('extractBtn').disabled=false;setStatus('File loaded: '+file.name+' ('+( file.size/1024).toFixed(1)+' KB) — Click ⚡ Extract to process');document.getElementById('formulaText').textContent='=EXTRACT_INVOICE("'+file.name+'")';document.getElementById('statusBarLeft').textContent='File: '+file.name}
+function setStatus(msg,type=''){const el=document.getElementById('statusMsg');el.textContent=msg;el.className='status-msg '+type}
+async function extractInvoice(){
+  if(!selectedFile)return;
+  document.getElementById('loadingOverlay').classList.add('show');
+  document.getElementById('extractBtn').disabled=true;
+  setStatus('Running OCR pipeline...');
+  const fd=new FormData();fd.append('file',selectedFile);
+  try{
+    const res=await fetch('http://127.0.0.1:8000/extract',{method:'POST',body:fd});
+    if(!res.ok){const e=await res.json();throw new Error(e.detail||'Server error '+res.status)}
+    const result=await res.json();
+    extractedData=result.data;
+    lastBaseName=selectedFile.name.replace(/\.[^.]+$/,'');
+    renderTable(extractedData,selectedFile.name);
+    setStatus('✅ Extraction complete! Click 📊 Download Excel (.xlsx) to open in Excel','success');
+    document.getElementById('xlsxBtn').disabled=false;
+    document.getElementById('csvBtn').disabled=false;
+    document.getElementById('clearBtn').style.display='inline-flex';
+    document.getElementById('statusBarLeft').textContent='Extraction complete — Excel ready';
+  }catch(err){
+    setStatus('❌ Error: '+err.message+' — Make sure backend is running at localhost:8000','error');
+    document.getElementById('extractBtn').disabled=false;
+  }finally{document.getElementById('loadingOverlay').classList.remove('show')}
+}
+function renderTable(data,filename){
+  const fields=[
+    {label:'Invoice Number',val:()=>data.invoice_number,note:'Unique invoice ID'},
+    {label:'Invoice Date',val:()=>data.invoice_date,note:'Date of issue'},
+    {label:'Vendor Name',val:()=>data.vendor?.name,note:'Supplier / From'},
+    {label:'Customer Name',val:()=>data.customer?.name,note:'Bill To / Buyer'},
+    {label:'Subtotal',val:()=>data.subtotal>0?'₹ '+Number(data.subtotal).toLocaleString('en-IN',{minimumFractionDigits:2}):'',note:'Before tax',currency:true},
+    {label:'Tax Amount',val:()=>data.tax>0?'₹ '+Number(data.tax).toLocaleString('en-IN',{minimumFractionDigits:2}):'',note:'GST / VAT',currency:true},
+    {label:'Total Amount',val:()=>data.total>0?'₹ '+Number(data.total).toLocaleString('en-IN',{minimumFractionDigits:2}):'',note:'Grand total',currency:true},
+    {label:'Validation',val:()=>data.validation_passed?'PASSED':'FAILED',note:data.validation_errors?.join(', ')||'All checks passed',validation:true},
+    {label:'Source File',val:()=>filename,note:'Uploaded file'},
+  ];
+  const tbody=document.getElementById('tableBody');tbody.innerHTML='';
+  const rowNums=document.getElementById('rowNums');rowNums.innerHTML='<div class="row-num-header"></div>';
+  fields.forEach((_,i)=>{const d=document.createElement('div');d.className='row-num';d.textContent=i+1;rowNums.appendChild(d)});
+  for(let i=fields.length+1;i<=fields.length+5;i++){const d=document.createElement('div');d.className='row-num';d.textContent=i;rowNums.appendChild(d)}
+  fields.forEach((f,i)=>{
+    const value=f.val()||'';const isEmpty=!value;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="field-label">${f.label}</td><td class="${f.currency?'currency':''} ${isEmpty?'empty':''}" onclick="selectCell(this,'${f.label}',\`${value}\`)">${isEmpty?'(not detected)':value}</td><td class="${f.validation?(value==='PASSED'?'valid':'invalid'):(isEmpty?'invalid':'valid')}">${f.validation?(value==='PASSED'?'✅ PASSED':'❌ FAILED'):(isEmpty?'⚠ Missing':'✓ Found')}</td><td style="color:#888;font-size:11px">${f.note}</td>`;
+    tbody.appendChild(tr);
+  });
+  for(let i=0;i<5;i++){const tr=document.createElement('tr');tr.className='empty-rows';tr.innerHTML='<td></td><td></td><td></td><td></td>';tbody.appendChild(tr)}
+  document.getElementById('statusBarCount').textContent='Rows: '+fields.length;
+}
+function selectCell(td,field,value){document.querySelectorAll('td.selected').forEach(el=>el.classList.remove('selected'));td.classList.add('selected');document.getElementById('cellRef').textContent='B'+td.parentElement.rowIndex;document.getElementById('formulaText').textContent=value||'(empty)'}
+function downloadXLSX(){
+  if(!lastBaseName)return;
+  const a=document.createElement('a');
+  a.href='http://127.0.0.1:8000/download/xlsx/'+lastBaseName;
+  a.download=lastBaseName+'.xlsx';a.click();
+  showToast('✅ Excel file downloaded: '+lastBaseName+'.xlsx — Open in Microsoft Excel!');
+}
+function downloadCSV(){
+  if(!extractedData)return;
+  const rows=[['Field','Extracted Value','Status'],['Invoice Number',extractedData.invoice_number||'',extractedData.invoice_number?'Found':'Missing'],['Invoice Date',extractedData.invoice_date||'',extractedData.invoice_date?'Found':'Missing'],['Vendor Name',extractedData.vendor?.name||'',extractedData.vendor?.name?'Found':'Missing'],['Customer Name',extractedData.customer?.name||'',extractedData.customer?.name?'Found':'Missing'],['Subtotal',extractedData.subtotal||0,extractedData.subtotal>0?'Found':'Missing'],['Tax Amount',extractedData.tax||0,extractedData.tax>0?'Found':'Missing'],['Total Amount',extractedData.total||0,extractedData.total>0?'Found':'Missing'],['Validation',extractedData.validation_passed?'PASSED':'FAILED','']];
+  const csv=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='extracted_invoice_data.csv';a.click();
+  showToast('✅ CSV downloaded!');
+}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),4000)}
+function clearAll(){
+  selectedFile=null;extractedData=null;lastBaseName='';
+  document.getElementById('fileInput').value='';document.getElementById('selectedFileName').textContent='';
+  document.getElementById('extractBtn').disabled=true;document.getElementById('xlsxBtn').disabled=true;document.getElementById('csvBtn').disabled=true;
+  document.getElementById('clearBtn').style.display='none';document.getElementById('formulaText').textContent='=EXTRACT_INVOICE(file)';
+  document.getElementById('cellRef').textContent='A1';document.getElementById('statusBarCount').textContent='Rows: 0';document.getElementById('statusBarLeft').textContent='Ready';
+  setStatus('No file selected. Open an invoice to begin extraction.');
+  const tbody=document.getElementById('tableBody');tbody.innerHTML='';
+  for(let i=0;i<8;i++){const tr=document.createElement('tr');tr.className='empty-rows';tr.innerHTML='<td></td><td></td><td></td><td></td>';tbody.appendChild(tr)}
+  const rowNums=document.getElementById('rowNums');rowNums.innerHTML='<div class="row-num-header"></div>';
+  for(let i=1;i<=10;i++){const d=document.createElement('div');d.className='row-num';d.textContent=i;rowNums.appendChild(d)}
+}
+</script>
+</body>
+</html>

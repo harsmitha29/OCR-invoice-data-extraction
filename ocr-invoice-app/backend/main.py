@@ -32,11 +32,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:5173",
-    ],
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,14 +41,12 @@ app.add_middleware(
 OUTPUT_DIR = Path("output")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
-POPPLER_PATH = r"C:\company\poppler-windows-24.08.0-0\Library\bin"
-
 
 class InvoiceExtractionPipeline:
     """Complete invoice extraction pipeline"""
 
     def __init__(self):
-        self.input_handler = InputHandler(poppler_path=POPPLER_PATH)
+        self.input_handler = InputHandler()
         self.preprocessor = ImagePreprocessor()
         self.ocr_engine = OCREngine()
         self.text_processor = TextProcessor()
@@ -107,6 +101,13 @@ async def extract_invoice(file: UploadFile = File(...)):
     Upload an invoice (PDF or image) and extract structured data.
     Supported formats: PDF, JPG, JPEG, PNG, BMP, TIFF
     """
+    allowed_types = {
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/bmp",
+        "image/tiff",
+    }
     allowed_extensions = {".pdf", ".jpg", ".jpeg", ".png", ".bmp", ".tiff"}
 
     file_ext = Path(file.filename).suffix.lower()
@@ -123,8 +124,9 @@ async def extract_invoice(file: UploadFile = File(...)):
     try:
         result = pipeline.process_invoice(tmp_path)
 
+        # Save outputs
         base_name = Path(file.filename).stem
-        pipeline.output_generator.generate_all_outputs(result, base_name, source_filename=file.filename)
+        pipeline.output_generator.generate_all_outputs(result, base_name)
 
         return JSONResponse(
             content={
@@ -144,20 +146,16 @@ async def extract_invoice(file: UploadFile = File(...)):
 
 @app.get("/download/{format}/{filename}")
 def download_output(format: str, filename: str):
-    """Download extracted data as JSON, CSV or XLSX"""
-    if format not in ("json", "csv", "xlsx"):
-        raise HTTPException(status_code=400, detail="Format must be 'json', 'csv' or 'xlsx'")
+    """Download extracted data as JSON or CSV"""
+    if format not in ("json", "csv"):
+        raise HTTPException(status_code=400, detail="Format must be 'json' or 'csv'")
 
     file_path = OUTPUT_DIR / f"{filename}.{format}"
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="Output file not found")
 
-    media_types = {
-        "json": "application/json",
-        "csv": "text/csv",
-        "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    }
-    return FileResponse(path=str(file_path), media_type=media_types[format], filename=f"{filename}.{format}")
+    media_type = "application/json" if format == "json" else "text/csv"
+    return FileResponse(path=str(file_path), media_type=media_type, filename=f"{filename}.{format}")
 
 
 if __name__ == "__main__":
